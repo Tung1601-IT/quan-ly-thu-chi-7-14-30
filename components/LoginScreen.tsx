@@ -31,9 +31,10 @@ const GoogleIcon: React.FC = () => (
 
 interface LoginScreenProps {
   onLoginSuccess: () => void;
+  onGoogleLoginClick: () => void;
 }
 
-const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
+const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onGoogleLoginClick }) => {
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
 
@@ -129,6 +130,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
 
         <div>
           <button
+            onClick={onGoogleLoginClick}
             type="button"
             className="w-full flex items-center justify-center py-3 px-4 border border-gray-300 rounded-lg shadow-sm bg-white text-lg font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-300"
           >
