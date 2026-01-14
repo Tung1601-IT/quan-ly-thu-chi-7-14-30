@@ -25,6 +25,12 @@ const FeedbackIcon: React.FC = () => (
     </svg>
 );
 
+const LogoutIcon: React.FC = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+    </svg>
+);
+
 
 interface DashboardScreenProps {
     balance: number;
@@ -37,6 +43,7 @@ interface DashboardScreenProps {
     onViewTransactionsClick: () => void;
     onViewStatisticsClick: () => void;
     onFeedbackClick: () => void;
+    onLogout: () => void;
 }
 
 const formatCurrency = (value: number) => {
@@ -54,13 +61,23 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({
     onViewTransactionsClick,
     onViewStatisticsClick,
     onFeedbackClick,
+    onLogout,
 }) => {
     const progressPercentage = (currentDay / totalDays) * 100;
 
     return (
         <div className="bg-gray-50 min-h-screen p-4 md:p-6">
-            <div className="max-w-md mx-auto">
-                <header className="mb-6">
+            <div className="max-w-md mx-auto relative">
+                <button
+                    onClick={onLogout}
+                    className="absolute top-0 right-0 flex items-center p-2 text-sm font-semibold text-gray-500 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors duration-200 z-10"
+                    aria-label="Đăng xuất"
+                >
+                    <LogoutIcon />
+                    <span>Đăng xuất</span>
+                </button>
+
+                <header className="mb-6 pt-10">
                     <h1 className="text-3xl font-bold text-gray-800 text-center">Bảng điều khiển</h1>
                 </header>
 

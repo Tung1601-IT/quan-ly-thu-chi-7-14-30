@@ -29,20 +29,69 @@ const GoogleIcon: React.FC = () => (
   </svg>
 );
 
+const AlertIcon: React.FC = () => (
+     <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fillRule="evenodd" d="M8.257 3.099c.636-1.21 2.852-1.21 3.488 0l6.112 11.69c.636 1.21-.472 2.711-1.744 2.711H3.89c-1.272 0-2.38-1.501-1.744-2.711l6.11-11.69zM9 9a1 1 0 012 0v4a1 1 0 11-2 0V9zm2 8a1 1 0 11-2 0 1 1 0 012 0z" clipRule="evenodd"></path></svg>
+);
+
+const CheckCircleIcon: React.FC = () => (
+    <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path></svg>
+);
+
+
 interface LoginScreenProps {
   onLoginSuccess: () => void;
   onGoogleLoginClick: () => void;
+  onNavigateToRegister: () => void;
+  onNavigateToForgotPassword: () => void;
 }
 
-const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onGoogleLoginClick }) => {
+const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onGoogleLoginClick, onNavigateToRegister, onNavigateToForgotPassword }) => {
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
+  const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    // Logic đăng nhập ở đây
-    console.log(`Đăng nhập với Email: ${email}`);
-    onLoginSuccess();
+    
+    setError(null);
+    setSuccessMessage(null);
+    setIsSubmitting(true);
+    
+    if (!email.trim() || !password.trim()) {
+        setError('Vui lòng nhập email và mật khẩu.');
+        setIsSubmitting(false);
+        return;
+    }
+
+    try {
+        const usersRaw = localStorage.getItem('users');
+        const users = usersRaw ? JSON.parse(usersRaw) : [];
+
+        const foundUser = users.find((user: any) => user.email === email && user.password === password);
+
+        if (foundUser) {
+            // Set session flags in localStorage
+            localStorage.setItem('isAuthenticated', 'true');
+            // Store only the email as the identifier for the current user
+            localStorage.setItem('currentUser', foundUser.email);
+
+            setSuccessMessage('Đăng nhập thành công!');
+            setTimeout(() => {
+                // App.tsx will handle loading the correct data and navigating
+                onLoginSuccess();
+            }, 1000);
+        } else {
+            setError('Email hoặc mật khẩu không đúng.');
+            setIsSubmitting(false);
+        }
+
+    } catch (err) {
+        setError('Đã có lỗi xảy ra. Vui lòng thử lại.');
+        console.error(err);
+        setIsSubmitting(false);
+    }
   };
 
   return (
@@ -86,12 +135,13 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onGoogleLogin
                 Mật khẩu
               </label>
               <div className="text-sm">
-                <a
-                  href="#"
-                  className="font-medium text-green-600 hover:text-green-500"
+                <button
+                  type="button"
+                  onClick={onNavigateToForgotPassword}
+                  className="font-medium text-green-600 hover:text-green-500 hover:underline focus:outline-none"
                 >
                   Quên mật khẩu?
-                </a>
+                </button>
               </div>
             </div>
             <input
@@ -107,12 +157,27 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onGoogleLogin
             />
           </div>
           
+          {error && (
+            <div className="flex items-center p-3 text-sm text-red-700 bg-red-100 rounded-lg" role="alert">
+              <AlertIcon />
+              <span className="font-medium">{error}</span>
+            </div>
+          )}
+
+          {successMessage && (
+            <div className="flex items-center p-3 text-sm text-green-700 bg-green-100 rounded-lg" role="alert">
+              <CheckCircleIcon />
+              <span className="font-medium">{successMessage}</span>
+            </div>
+          )}
+
           <div>
             <button
               type="submit"
-              className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-lg font-bold text-white bg-green-500 hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors duration-300"
+              disabled={isSubmitting}
+              className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-lg font-bold text-white bg-green-500 hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors duration-300 disabled:bg-green-300 disabled:cursor-not-allowed"
             >
-              Đăng nhập
+              {isSubmitting && !successMessage ? 'Đang xử lý...' : 'Đăng nhập'}
             </button>
           </div>
         </form>
@@ -141,9 +206,13 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onGoogleLogin
 
         <p className="mt-8 text-center text-md text-gray-600">
           Chưa có tài khoản?{' '}
-          <a href="#" className="font-bold text-green-600 hover:text-green-500">
+          <button
+            type="button"
+            onClick={onNavigateToRegister}
+            className="font-bold text-green-600 hover:text-green-500 hover:underline focus:outline-none"
+          >
             Đăng ký tài khoản
-          </a>
+          </button>
         </p>
       </div>
     </div>
