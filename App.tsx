@@ -1,8 +1,8 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import ChallengeSelectScreen from './components/ChallengeSelectScreen';
 import LoginScreen from './components/LoginScreen';
 import RegisterScreen from './components/RegisterScreen';
-import SetupScreen from './components/SetupScreen';
 import DashboardScreen from './components/DashboardScreen';
 import AddIncomeScreen from './components/AddIncomeScreen';
 import AddExpenseScreen from './components/AddExpenseScreen';
@@ -12,6 +12,7 @@ import CompletionScreen from './components/CompletionScreen';
 import FeedbackScreen from './components/FeedbackScreen';
 import GoogleLoginScreen from './components/GoogleLoginScreen';
 import ForgotPasswordScreen from './components/ForgotPasswordScreen';
+import SetupChallengeScreen, { Jar } from './components/SetupChallengeScreen';
 
 // Định nghĩa kiểu dữ liệu cho một giao dịch
 export type Transaction = {
@@ -28,6 +29,8 @@ type UserData = {
     transactions: Transaction[];
     selectedChallenge: string | null;
     challengeStartDate: string | null;
+    totalBudget?: number;
+    jars?: Jar[];
 }
 
 const parseCurrency = (value: string): number => {
@@ -37,15 +40,43 @@ const parseCurrency = (value: string): number => {
 // Helper function to get user-specific data key
 const getUserDataKey = (email: string): string => `userData_${email}`;
 
+const Toast: React.FC<{ message: string }> = ({ message }) => (
+    <div className="fixed top-4 right-4 z-50 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 rounded-lg shadow-lg flex items-center animate-slide-in" role="alert">
+        <svg className="w-6 h-6 mr-3" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fillRule="evenodd" d="M8.257 3.099c.636-1.21 2.852-1.21 3.488 0l6.112 11.69c.636 1.21-.472 2.711-1.744 2.711H3.89c-1.272 0-2.38-1.501-1.744-2.711l6.11-11.69zM9 9a1 1 0 012 0v4a1 1 0 11-2 0V9zm2 8a1 1 0 11-2 0 1 1 0 012 0z" clipRule="evenodd"></path></svg>
+        <p className="font-bold">{message}</p>
+        <style>{`
+          @keyframes slide-in {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+          }
+          .animate-slide-in { animation: slide-in 0.5s ease-out forwards; }
+        `}</style>
+    </div>
+);
+
+
 const App: React.FC = () => {
-  const [currentScreen, setCurrentScreen] = useState<'login' | 'register' | 'forgotPassword' | 'challengeSelect' | 'setup' | 'dashboard' | 'addIncome' | 'addExpense' | 'transactionList' | 'statistics' | 'completion' | 'feedback'>('login');
+  const [currentScreen, setCurrentScreen] = useState<'login' | 'register' | 'forgotPassword' | 'challengeSelect' | 'setupChallenge' | 'dashboard' | 'addIncome' | 'addExpense' | 'transactionList' | 'statistics' | 'completion' | 'feedback'>('login');
   const [showGoogleLogin, setShowGoogleLogin] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
   
   // State for the currently logged-in user's data
   const [selectedChallenge, setSelectedChallenge] = useState<string | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [challengeStartDate, setChallengeStartDate] = useState<string | null>(null);
+  const [totalBudget, setTotalBudget] = useState<number>(0);
+  const [jars, setJars] = useState<Jar[]>([]);
+
+  // Effect to auto-hide toast message
+  useEffect(() => {
+    if (toastMessage) {
+        const timer = setTimeout(() => {
+            setToastMessage(null);
+        }, 3000);
+        return () => clearTimeout(timer);
+    }
+  }, [toastMessage]);
 
   // Effect to check auth state and load user data on initial load
   useEffect(() => {
@@ -59,21 +90,28 @@ const App: React.FC = () => {
             const savedUserDataRaw = localStorage.getItem(userDataKey);
             const savedUserData: UserData = savedUserDataRaw 
                 ? JSON.parse(savedUserDataRaw) 
-                : { transactions: [], selectedChallenge: null, challengeStartDate: null };
+                : { transactions: [], selectedChallenge: null, challengeStartDate: null, totalBudget: 0, jars: [] };
 
             setTransactions(savedUserData.transactions);
             setSelectedChallenge(savedUserData.selectedChallenge);
             setChallengeStartDate(savedUserData.challengeStartDate);
+            setTotalBudget(savedUserData.totalBudget || 0);
+            setJars(savedUserData.jars || []);
             
-            // Navigate based on whether a challenge has been selected
-            if (savedUserData.selectedChallenge) {
+            // Refined navigation logic
+            if (savedUserData.selectedChallenge && (savedUserData.totalBudget || 0) > 0) {
+                // Challenge selected AND setup is complete -> Dashboard
                 setCurrentScreen('dashboard');
+            } else if (savedUserData.selectedChallenge) {
+                // Challenge selected BUT setup is incomplete -> Setup Challenge Screen
+                setCurrentScreen('setupChallenge');
             } else {
+                // No challenge selected -> Challenge Select Screen
                 setCurrentScreen('challengeSelect');
             }
         }
         // If not authenticated, the screen remains 'login' by default
-    } catch (error) {
+    } catch (error: any) {
         console.error("Failed to parse data from localStorage", error);
         localStorage.clear(); // Clear storage if data is corrupted
     }
@@ -91,14 +129,16 @@ const App: React.FC = () => {
             const dataToSave: UserData = {
                 transactions,
                 selectedChallenge,
-                challengeStartDate
+                challengeStartDate,
+                totalBudget,
+                jars,
             };
             localStorage.setItem(userDataKey, JSON.stringify(dataToSave));
         }
-    } catch (error) {
+    } catch (error: any) {
         console.error("Failed to save data to localStorage", error);
     }
-  }, [transactions, selectedChallenge, challengeStartDate, isLoading]);
+  }, [transactions, selectedChallenge, challengeStartDate, totalBudget, jars, isLoading]);
 
 
   useEffect(() => {
@@ -129,18 +169,25 @@ const App: React.FC = () => {
       const savedUserDataRaw = localStorage.getItem(userDataKey);
       const userData: UserData = savedUserDataRaw
         ? JSON.parse(savedUserDataRaw)
-        : { transactions: [], selectedChallenge: null, challengeStartDate: null };
+        : { transactions: [], selectedChallenge: null, challengeStartDate: null, totalBudget: 0, jars: [] };
       
       // Update state with this user's data
       setTransactions(userData.transactions);
       setSelectedChallenge(userData.selectedChallenge);
       setChallengeStartDate(userData.challengeStartDate);
+      setTotalBudget(userData.totalBudget || 0);
+      setJars(userData.jars || []);
       
-      // Navigate
-      if (userData.selectedChallenge) {
-          setCurrentScreen('dashboard');
+      // Refined navigation logic
+      if (userData.selectedChallenge && (userData.totalBudget || 0) > 0) {
+        // If a challenge is selected AND setup is complete, go to dashboard.
+        setCurrentScreen('dashboard');
+      } else if (userData.selectedChallenge) {
+        // If a challenge is selected but setup is NOT complete, go to setup screen.
+        setCurrentScreen('setupChallenge');
       } else {
-          setCurrentScreen('challengeSelect');
+        // If no challenge is selected, go to challenge selection.
+        setCurrentScreen('challengeSelect');
       }
   };
 
@@ -151,7 +198,6 @@ const App: React.FC = () => {
 
   const handleGoogleLoginSuccess = () => {
       setShowGoogleLogin(false);
-      // Mock Google login success
       localStorage.setItem('isAuthenticated', 'true');
       localStorage.setItem('currentUser', 'nguyenvana@gmail.com');
       handleLoginSuccess();
@@ -162,42 +208,36 @@ const App: React.FC = () => {
   };
 
   const handleChallengeSelect = (duration: string) => {
-    const challengeValue = duration.split(' ')[0]; // e.g., "7"
+    const challengeValue = duration.split(' ')[0];
     const startDate = new Date().toISOString();
     
-    // Update state, the useEffect will handle saving to localStorage
     setSelectedChallenge(challengeValue);
     setChallengeStartDate(startDate);
     
-    // Initialize transactions if it's the first time
-    if(transactions.length === 0) {
-        setTransactions([]);
-    }
-    
-    setCurrentScreen('setup');
+    setCurrentScreen('setupChallenge');
   };
   
+  const handleSetupChallenge = (data: { days: number; totalBudget: number; jars: Jar[] }) => {
+    setTotalBudget(data.totalBudget);
+    setJars(data.jars);
+
+    const initialIncomeTransaction: Transaction = {
+      id: `income-${Date.now()}`,
+      type: 'income',
+      amount: data.totalBudget,
+      source: 'Ngân sách ban đầu',
+      date: new Date().toISOString().split('T')[0],
+      notes: `Ngân sách cho thử thách ${data.days} ngày`
+    };
+    
+    setTransactions([initialIncomeTransaction]);
+    setCurrentScreen('dashboard');
+  };
+
   const handleDeleteTransaction = (id: string) => {
     if (window.confirm('Bạn có chắc chắn muốn xóa giao dịch này không?')) {
       setTransactions(transactions.filter(t => t.id !== id));
     }
-  };
-
-  const handleSetupComplete = (income: string, budget: string) => {
-    const initialIncomeTransaction: Transaction = {
-      id: `income-${Date.now()}`,
-      type: 'income',
-      amount: parseCurrency(income),
-      source: 'Thu nhập ban đầu',
-      date: new Date().toISOString().split('T')[0],
-      notes: 'Khoản thu nhập đầu tiên khi bắt đầu thử thách'
-    };
-    
-    if(transactions.length === 0) {
-        setTransactions([initialIncomeTransaction]);
-    }
-
-    setCurrentScreen('dashboard');
   };
 
   const handleAddIncome = (income: { amount: string; source: string; date: string; notes: string }) => {
@@ -213,45 +253,6 @@ const App: React.FC = () => {
     setCurrentScreen('dashboard');
   };
 
-  const handleAddExpense = (expense: { amount: string; category: string; date: string; notes: string }) => {
-    const newExpense: Transaction = {
-      id: `expense-${Date.now()}`,
-      type: 'expense',
-      amount: parseCurrency(expense.amount),
-      source: expense.category,
-      date: expense.date,
-      notes: expense.notes,
-    };
-    setTransactions(prev => [newExpense, ...prev]);
-    setCurrentScreen('dashboard');
-  };
-  
-  const handleStartNewChallenge = () => {
-    setSelectedChallenge(null);
-    setChallengeStartDate(null);
-    // Note: Transactions are kept for the new challenge
-    setCurrentScreen('challengeSelect');
-  };
-
-  const handleFeedbackSubmit = () => {
-    alert('Cảm ơn bạn đã gửi phản hồi!');
-    setCurrentScreen('dashboard');
-  };
-
-  const handleLogout = () => {
-    // Clear react state to default values
-    setTransactions([]);
-    setSelectedChallenge(null);
-    setChallengeStartDate(null);
-    
-    // Remove session-related items from localStorage, but keep user data
-    localStorage.removeItem('isAuthenticated');
-    localStorage.removeItem('currentUser');
-
-    setCurrentScreen('login');
-  };
-
-
   const { totalIncome, totalExpense, balance } = useMemo(() => {
     const income = transactions
       .filter(t => t.type === 'income')
@@ -265,6 +266,74 @@ const App: React.FC = () => {
       balance: income - expense,
     };
   }, [transactions]);
+
+  const handleAddExpense = (expense: { amount: string; category: string; date: string; notes: string }) => {
+    const newExpenseAmount = parseCurrency(expense.amount);
+
+    // Calculate current spending in the target jar
+    const targetJar = jars.find(jar => jar.name === expense.category);
+    const currentSpentInJar = transactions
+        .filter(t => t.type === 'expense' && t.source === expense.category)
+        .reduce((sum, t) => sum + t.amount, 0);
+    
+    // Define failure conditions
+    const exceedsBalance = newExpenseAmount > balance;
+    const exceedsTotalBudget = (totalExpense + newExpenseAmount) > totalBudget;
+    const exceedsJarLimit = targetJar ? (currentSpentInJar + newExpenseAmount > targetJar.limit) : false;
+
+    // Check if any failure condition is met
+    if (exceedsBalance || exceedsTotalBudget || exceedsJarLimit) {
+        setToastMessage("Khoản chi vượt quá giới hạn cho phép. Không thể lưu.");
+        return; // Stop the function
+    }
+
+    // If all checks pass, add the expense
+    const newExpense: Transaction = {
+      id: `expense-${Date.now()}`,
+      type: 'expense',
+      amount: newExpenseAmount,
+      source: expense.category,
+      date: expense.date,
+      notes: expense.notes,
+    };
+    setTransactions(prev => [newExpense, ...prev]);
+    setCurrentScreen('dashboard');
+  };
+
+  const handleAddExpenseClick = () => {
+    if (balance <= 0) {
+        setToastMessage("Số dư hiện tại bằng 0. Bạn không thể chi tiêu thêm.");
+    } else {
+        setCurrentScreen('addExpense');
+    }
+  };
+  
+  const handleStartNewChallenge = () => {
+    setSelectedChallenge(null);
+    setChallengeStartDate(null);
+    setTotalBudget(0);
+    setJars([]);
+    setCurrentScreen('challengeSelect');
+  };
+
+  const handleFeedbackSubmit = () => {
+    alert('Cảm ơn bạn đã gửi phản hồi!');
+    setCurrentScreen('dashboard');
+  };
+
+  const handleLogout = () => {
+    // Clear react state to default values
+    setTransactions([]);
+    setSelectedChallenge(null);
+    setChallengeStartDate(null);
+    setTotalBudget(0);
+    setJars([]);
+    
+    localStorage.removeItem('isAuthenticated');
+    localStorage.removeItem('currentUser');
+
+    setCurrentScreen('login');
+  };
 
   const renderCurrentScreen = () => {
     if (currentScreen === 'register') {
@@ -336,19 +405,19 @@ const App: React.FC = () => {
           currentDay={currentDay}
           totalDays={totalDays}
           onAddIncomeClick={() => setCurrentScreen('addIncome')}
-          onAddExpenseClick={() => setCurrentScreen('addExpense')}
+          onAddExpenseClick={handleAddExpenseClick}
           onViewTransactionsClick={() => setCurrentScreen('transactionList')}
           onViewStatisticsClick={() => setCurrentScreen('statistics')}
           onFeedbackClick={() => setCurrentScreen('feedback')}
           onLogout={handleLogout}
       />;
     }
-    if (currentScreen === 'setup') {
-      return <SetupScreen 
-                challengeDuration={(selectedChallenge || '') + ' NGÀY'} 
-                onBack={() => setCurrentScreen('challengeSelect')}
-                onStart={handleSetupComplete}
-              />;
+    if (currentScreen === 'setupChallenge') {
+        return <SetupChallengeScreen 
+            challengeDuration={(selectedChallenge || '') + ' NGÀY'}
+            onBack={() => setCurrentScreen('challengeSelect')}
+            onSetupChallenge={handleSetupChallenge}
+        />
     }
     if (currentScreen === 'challengeSelect') {
       return <ChallengeSelectScreen 
@@ -374,6 +443,7 @@ const App: React.FC = () => {
   
   return (
     <>
+      {toastMessage && <Toast message={toastMessage} />}
       {renderCurrentScreen()}
       {showGoogleLogin && <GoogleLoginScreen onContinue={handleGoogleLoginSuccess} onCancel={handleGoogleLoginCancel} />}
     </>
