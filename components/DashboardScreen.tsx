@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 
 const PlusIcon: React.FC = () => (
@@ -26,12 +27,19 @@ const FeedbackIcon: React.FC = () => (
     </svg>
 );
 
+interface JarWithSpent {
+    name: string;
+    limit: number;
+    spent: number;
+}
+
 interface DashboardScreenProps {
     balance: number;
     totalIncome: number;
     totalExpense: number;
     currentDay: number;
     totalDays: number;
+    jars: JarWithSpent[];
     onAddIncomeClick: () => void;
     onAddExpenseClick: () => void;
     onViewTransactionsClick: () => void;
@@ -44,12 +52,45 @@ const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value);
 };
 
+const formatCurrencyShort = (value: number) => {
+     return new Intl.NumberFormat('vi-VN').format(value);
+}
+
+const JarProgressBar: React.FC<{ jar: JarWithSpent }> = ({ jar }) => {
+    const { name, spent, limit } = jar;
+    const percentage = limit > 0 ? Math.min((spent / limit) * 100, 100) : 0;
+
+    const getProgressBarColor = () => {
+        if (percentage >= 100) return 'bg-red-500';
+        if (percentage >= 70) return 'bg-yellow-500';
+        return 'bg-green-500';
+    };
+    
+    return (
+        <div>
+            <div className="flex justify-between items-center mb-1">
+                <span className="text-sm font-medium text-gray-700">{name}</span>
+                <span className="text-sm font-semibold text-gray-600">
+                    {formatCurrencyShort(spent)} / {formatCurrencyShort(limit)} ₫
+                </span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2.5">
+                <div 
+                    className={`h-2.5 rounded-full transition-all duration-500 ${getProgressBarColor()}`} 
+                    style={{ width: `${percentage}%` }}
+                ></div>
+            </div>
+        </div>
+    );
+};
+
 const DashboardScreen: React.FC<DashboardScreenProps> = ({
     balance,
     totalIncome,
     totalExpense,
     currentDay,
     totalDays,
+    jars,
     onAddIncomeClick,
     onAddExpenseClick,
     onViewTransactionsClick,
@@ -59,6 +100,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({
 }) => {
     const progress = Math.min((currentDay / totalDays) * 100, 100);
     const isAddExpenseDisabled = balance <= 0;
+    const validJars = jars.filter(jar => jar.limit > 0);
 
     return (
         <div className="bg-gray-50 min-h-screen p-4">
@@ -102,6 +144,19 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({
                             <div className="bg-green-500 h-2.5 rounded-full" style={{ width: `${progress}%` }}></div>
                         </div>
                     </div>
+
+                    {/* Jars Progress */}
+                    {validJars.length > 0 && (
+                        <div className="bg-white p-6 rounded-2xl shadow-lg mb-6">
+                            <h2 className="font-bold text-gray-800 mb-4">Ngân sách theo danh mục</h2>
+                            <div className="space-y-4">
+                                {validJars.map(jar => (
+                                    <JarProgressBar key={jar.name} jar={jar} />
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
 
                     {/* Quick Actions */}
                     <div className="grid grid-cols-2 gap-4 mb-6">

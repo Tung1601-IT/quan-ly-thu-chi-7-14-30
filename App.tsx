@@ -266,6 +266,18 @@ const App: React.FC = () => {
       balance: income - expense,
     };
   }, [transactions]);
+  
+  const jarsWithSpent = useMemo(() => {
+     if (!jars || jars.length === 0) {
+       return [];
+     }
+     return jars.map(jar => {
+       const spent = transactions
+         .filter(t => t.type === 'expense' && t.source === jar.name)
+         .reduce((sum, t) => sum + t.amount, 0);
+       return { ...jar, spent };
+     });
+   }, [jars, transactions]);
 
   const handleAddExpense = (expense: { amount: string; category: string; date: string; notes: string }) => {
     const newExpenseAmount = parseCurrency(expense.amount);
@@ -275,13 +287,19 @@ const App: React.FC = () => {
     const currentSpentInJar = transactions
         .filter(t => t.type === 'expense' && t.source === expense.category)
         .reduce((sum, t) => sum + t.amount, 0);
+        
+    // New check: if the category budget is already used up, block the transaction
+    if (targetJar && targetJar.limit > 0 && currentSpentInJar >= targetJar.limit) {
+        setToastMessage("Danh mục đã hết ngân sách");
+        return;
+    }
     
-    // Define failure conditions
+    // Existing failure conditions
     const exceedsBalance = newExpenseAmount > balance;
     const exceedsTotalBudget = (totalExpense + newExpenseAmount) > totalBudget;
     const exceedsJarLimit = targetJar ? (currentSpentInJar + newExpenseAmount > targetJar.limit) : false;
 
-    // Check if any failure condition is met
+    // Check if any existing failure condition is met
     if (exceedsBalance || exceedsTotalBudget || exceedsJarLimit) {
         setToastMessage("Khoản chi vượt quá giới hạn cho phép. Không thể lưu.");
         return; // Stop the function
@@ -313,6 +331,7 @@ const App: React.FC = () => {
     setChallengeStartDate(null);
     setTotalBudget(0);
     setJars([]);
+    setTransactions([]);
     setCurrentScreen('challengeSelect');
   };
 
@@ -369,7 +388,9 @@ const App: React.FC = () => {
              />;
     }
     if (currentScreen === 'completion') {
+      const isSuccess = totalExpense <= totalBudget;
       return <CompletionScreen 
+              isSuccess={isSuccess}
               totalIncome={totalIncome}
               totalExpense={totalExpense}
               savedAmount={balance}
@@ -404,6 +425,7 @@ const App: React.FC = () => {
           totalExpense={totalExpense}
           currentDay={currentDay}
           totalDays={totalDays}
+          jars={jarsWithSpent}
           onAddIncomeClick={() => setCurrentScreen('addIncome')}
           onAddExpenseClick={handleAddExpenseClick}
           onViewTransactionsClick={() => setCurrentScreen('transactionList')}

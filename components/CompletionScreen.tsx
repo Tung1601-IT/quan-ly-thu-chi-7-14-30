@@ -1,6 +1,7 @@
 import React from 'react';
 
 interface CompletionScreenProps {
+    isSuccess: boolean;
     totalIncome: number;
     totalExpense: number;
     savedAmount: number;
@@ -18,6 +19,7 @@ const PartyPopperIcon: React.FC = () => (
 );
 
 const CompletionScreen: React.FC<CompletionScreenProps> = ({
+    isSuccess,
     totalIncome,
     totalExpense,
     savedAmount,
@@ -29,10 +31,13 @@ const CompletionScreen: React.FC<CompletionScreenProps> = ({
         <div className="bg-gray-50 min-h-screen flex items-center justify-center p-4">
             <div className="bg-white p-8 md:p-10 rounded-2xl shadow-lg w-full max-w-md text-center">
                 <header className="mb-6">
-                    <PartyPopperIcon />
-                    <h1 className="text-3xl font-bold text-gray-800 mt-4">Hoàn thành thử thách!</h1>
+                    {isSuccess ? <PartyPopperIcon /> : <span role="img" aria-label="crying face" className="text-5xl">😢</span>}
+                    <h1 className="text-3xl font-bold text-gray-800 mt-4">{isSuccess ? 'Hoàn thành thử thách!' : 'Thử thách kết thúc'}</h1>
                     <p className="text-gray-600 mt-2 text-lg">
-                        Chúc mừng bạn đã hoàn thành thử thách <span className="font-bold text-green-600">{challengeDuration}</span>.
+                        {isSuccess 
+                            ? <>Chúc mừng bạn đã hoàn thành thử thách <span className="font-bold text-green-600">{challengeDuration}</span>.</>
+                            : <>Bạn đã hoàn thành thử thách <span className="font-bold text-red-500">{challengeDuration}</span> nhưng chưa đạt mục tiêu. Cố gắng lần sau nhé!</>
+                        }
                     </p>
                 </header>
 
